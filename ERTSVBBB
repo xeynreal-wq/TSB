@@ -1,0 +1,185 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "TSB - Extreme Clay & Combat Hub",
+   LoadingTitle = "The Strongest Battlegrounds Booster",
+   LoadingSubtitle = "by Gemini",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false
+})
+
+-- Services & Variables
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
+local LockTarget = nil
+local TargetBehind = false
+local AutoBlockEnabled = false
+local AutoTrashEnabled = false
+
+-- Tabs
+local MainTab = Window:CreateTab("Clay & FPS", 4483362458)
+local CombatTab = Window:CreateTab("Combat & Lock", 4483362458)
+local MiscTab = Window:CreateTab("Misc & Utility", 4483362458)
+
+-- 1. CLAY MODE (ดินน้ำมันขั้นสุด)
+MainTab:CreateButton({
+   Name = "Enable Extreme Clay Mode (ภาพดินน้ำมัน 100%)",
+   Callback = function()
+      pcall(function()
+         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+         sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+      end)
+      
+      Lighting.GlobalShadows = false
+      Lighting.FogEnd = 9e9
+      Lighting.Brightness = 1
+
+      local function applyClay(v)
+         if v:IsA("Decal") or v:IsA("Texture") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") or v:IsA("SurfaceAppearance") then
+            v:Destroy()
+         elseif v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+         elseif v:IsA("MeshPart") then
+            v.TextureID = ""
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+         elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Highlight") then
+            v:Destroy()
+         end
+      end
+
+      for _, v in pairs(game:GetDescendants()) do
+         pcall(function() applyClay(v) end)
+      end
+
+      game.DescendantAdded:Connect(function(v)
+         task.spawn(function() pcall(function() applyClay(v) end) end)
+      end)
+
+      Rayfield:Notify({Title = "Clay Mode", Content = "เปิดใช้งานภาพดินน้ำมันเรียบร้อย!", Duration = 3})
+   end,
+})
+
+-- 2. COMBAT & LOCK TARGET
+CombatTab:CreateToggle({
+   Name = "Lock Target (ล็อกเป้าผู้เล่นใกล้สุด)",
+   CurrentValue = false,
+   Callback = function(Value)
+      if Value then
+         RunService:BindToRenderStep("LockOn", 100, function()
+            local closestPlayer = nil
+            local shortestDistance = math.huge
+            
+            for _, player in pairs(Players:GetPlayers()) do
+               if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                  local pos = player.Character.HumanoidRootPart.Position
+                  local dist = (LocalPlayer.Character.HumanoidRootPart.Position - pos).Magnitude
+                  if dist < shortestDistance and dist < 150 then
+                     shortestDistance = dist
+                     closestPlayer = player
+                  end
+               end
+            end
+            
+            LockTarget = closestPlayer
+            if LockTarget and LockTarget.Character and LockTarget.Character:FindFirstChild("HumanoidRootPart") then
+               local targetPos = LockTarget.Character.HumanoidRootPart.Position
+               if TargetBehind then
+                  -- ล็อกหลังเป้าหมาย
+                  local behindPos = targetPos - (LockTarget.Character.HumanoidRootPart.CFrame.LookVector * 3)
+                  Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+                  LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(behindPos, targetPos)
+               else
+                  -- ล็อกเป้าตามปกติ
+                  Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+               end
+            end
+         end)
+      else
+         RunService:UnbindFromRenderStep("LockOn")
+         LockTarget = nil
+      end
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Lock Behind Mode (ล็อกให้อยู่หลังศัตรู)",
+   CurrentValue = false,
+   Callback = function(Value)
+      TargetBehind = Value
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Auto Block (บล็อกการโจมตีอัตโนมัติ)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoBlockEnabled = Value
+      if AutoBlockEnabled then
+         task.spawn(function()
+            while AutoBlockEnabled do
+               task.wait(0.1)
+               if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                  for _, plr in pairs(Players:GetPlayers()) do
+                     if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (LocalPlayer.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+                        -- ตรวจจับศัตรูเข้าใกล้ในระยะโจมตีเพื่อกดบล็อก
+                        if dist < 12 then
+                           local vim = game:GetService("VirtualInputManager")
+                           vim:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                           task.wait(0.5)
+                           vim:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                        end
+                     end
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
+
+-- 3. MISC & UTILITIES (หายตัว & ถังขยะ)
+MiscTab:CreateButton({
+   Name = "Invisibility (ลบตัวตน/หายตัว)",
+   Callback = function()
+      if LocalPlayer.Character then
+         for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") or v:IsA("Decal") then
+               v.Transparency = 1
+            end
+         end
+         Rayfield:Notify({Title = "Invisibility", Content = "ซ่อนตัวละครของคุณแล้ว (Client Side)", Duration = 3})
+      end
+   end,
+})
+
+MiscTab:CreateToggle({
+   Name = "Auto Pick Trash Can (หยิบถังขยะอัตโนมัติ)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoTrashEnabled = Value
+      if AutoTrashEnabled then
+         task.spawn(function()
+            while AutoTrashEnabled do
+               task.wait(0.5)
+               if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                  for _, obj in pairs(workspace:GetDescendants()) do
+                     if obj.Name:lower():find("trash") or obj.Name:lower():find("can") then
+                        if obj:IsA("BasePart") and (LocalPlayer.Character.HumanoidRootPart.Position - obj.Position).Magnitude < 30 then
+                           firetouchinterest(LocalPlayer.Character.HumanoidRootPart, obj, 0)
+                           firetouchinterest(LocalPlayer.Character.HumanoidRootPart, obj, 1)
+                        end
+                     end
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
