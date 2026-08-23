@@ -1,0 +1,202 @@
+--[[
+    Script Name: อับดุล เถื่อน hub [TinyTask Mouse Edition]
+    Target Game: Roblox All Games (TTD / Defense / All)
+    Style: TinyTask Pixel-Perfect Screen Mouse & Click Recorder
+--]]
+
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
+-- Recorder Data
+local MouseMacro = {}
+local IsRecording = false
+local IsPlaying = false
+local StartTime = 0
+local LoopInfinite = false
+
+-- UI Setup
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "AbdulTinyTaskHub"
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 240, 0, 310)
+Frame.Position = UDim2.new(0.05, 0, 0.25, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.Active = true
+Frame.Draggable = true
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "อับดุล เถื่อน hub | TinyTask Mouse"
+Title.TextColor3 = Color3.fromRGB(0, 255, 120)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 14
+
+local StatusLabel = Instance.new("TextLabel", Frame)
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 25)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 35)
+StatusLabel.Text = "สถานะ: พร้อมใช้งาน (TinyTask)"
+StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Font = Enum.Font.SourceSans
+StatusLabel.TextSize = 12
+
+local function createBtn(text, posY, color, callback)
+    local btn = Instance.new("TextButton", Frame)
+    btn.Size = UDim2.new(0.9, 0, 0, 32)
+    btn.Position = UDim2.new(0.05, 0, 0, posY)
+    btn.Text = text
+    btn.BackgroundColor3 = color
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 13
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+-- 1. RECORD BUTTON
+local RecBtn
+RecBtn = createBtn("🔴 เริ่มอัด TinyTask (Record)", 65, Color3.fromRGB(180, 40, 40), function()
+    if not IsRecording and not IsPlaying then
+        MouseMacro = {}
+        IsRecording = true
+        StartTime = tick()
+        StatusLabel.Text = "กำลังอัดการเคลื่อนที่เมาส์..."
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        RecBtn.Text = "⏹️ หยุดอัด (Stop)"
+    elseif IsRecording then
+        IsRecording = false
+        StatusLabel.Text = "บันทึกเรียบร้อย (" .. #MouseMacro .. " โหนด)"
+        StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+        RecBtn.Text = "🔴 เริ่มอัด TinyTask (Record)"
+    end
+end)
+
+-- 2. PLAY BUTTON
+local PlayBtn
+PlayBtn = createBtn("▶️ เล่น TinyTask (Play)", 105, Color3.fromRGB(40, 150, 40), function()
+    if #MouseMacro == 0 then
+        StatusLabel.Text = "ไม่มีข้อมูลที่อัดไว้!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 150, 0)
+        return
+    end
+
+    if not IsPlaying and not IsRecording then
+        IsPlaying = true
+        StatusLabel.Text = "กำลังรัน TinyTask เมาส์..."
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+        
+        task.spawn(function()
+            while IsPlaying do
+                local playStart = tick()
+                for _, action in ipairs(MouseMacro) do
+                    if not IsPlaying then break end
+                    
+                    local timeToWait = action.Time - (tick() - playStart)
+                    if timeToWait > 0 then task.wait(timeToWait) end
+                    
+                    -- จำลองการย้ายเมาส์และกดคลิก (Virtual Mouse Click)
+                    pcall(function()
+                        if action.Type == "Move" then
+                            VirtualInputManager:SendMouseMoveEvent(action.X, action.Y, game)
+                        elseif action.Type == "ClickDown" then
+                            VirtualInputManager:SendMouseButtonEvent(action.X, action.Y, 0, true, game, 1)
+                        elseif action.Type == "ClickUp" then
+                            VirtualInputManager:SendMouseButtonEvent(action.X, action.Y, 0, false, game, 1)
+                        elseif action.Type == "Key" then
+                            VirtualInputManager:SendKeyEvent(action.Down, action.KeyCode, false, game)
+                        end
+                    end)
+                end
+                
+                if not LoopInfinite then
+                    IsPlaying = false
+                    StatusLabel.Text = "เล่น TinyTask จบแล้ว"
+                    StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    break
+                else
+                    StatusLabel.Text = "จบ 1 รอบ กำลังเริ่มรอบใหม่..."
+                    task.wait(1)
+                end
+            end
+        end)
+    else
+        IsPlaying = false
+        StatusLabel.Text = "หยุดการเล่น TinyTask"
+        StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+end)
+
+-- 3. INFINITE TOGGLE
+local InfBtn = createBtn("🔄 โหมด Infinite: OFF", 145, Color3.fromRGB(100, 100, 100), function()
+    LoopInfinite = not LoopInfinite
+    InfBtn.Text = "🔄 โหมด Infinite: " .. (LoopInfinite and "ON" or "OFF")
+    InfBtn.BackgroundColor3 = LoopInfinite and Color3.fromRGB(0, 150, 200) or Color3.fromRGB(100, 100, 100)
+end)
+
+-- 4. AUTO REPLAY / PLAY AGAIN
+createBtn("🔁 Auto Replay (กดปุ่มเริ่มใหม่)", 185, Color3.fromRGB(80, 80, 180), function()
+    task.spawn(function()
+        while task.wait(3) do
+            pcall(function()
+                local gui = game:GetService("Players").LocalPlayer.PlayerGui
+                for _, btn in pairs(gui:GetDescendants()) do
+                    if btn:IsA("TextButton") and (btn.Text:lower():find("replay") or btn.Text:lower():find("retry") or btn.Text:lower():find("play again")) then
+                        firesignal(btn.MouseButton1Click)
+                    end
+                end
+            end)
+        end
+    end)
+    StatusLabel.Text = "เปิด Auto Replay แล้ว"
+end)
+
+-- 5. CLAY MODE
+createBtn("🧱 เปิดโหมดดินน้ำมัน 100%", 225, Color3.fromRGB(50, 50, 50), function()
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+    end)
+    Lighting.GlobalShadows = false
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("Decal") or v:IsA("Texture") or v:IsA("SurfaceAppearance") then v:Destroy()
+        elseif v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then v:Destroy() end
+    end
+    StatusLabel.Text = "ปรับโหมดดินน้ำมันเรียบร้อย"
+end)
+
+-- MOUSE & KEYBOARD EVENT RECORDING (ดักการเคลื่อนที่ตำแหน่งเมาส์)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if IsRecording then
+        local pos = UserInputService:GetMouseLocation()
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            table.insert(MouseMacro, {Time = tick() - StartTime, Type = "ClickDown", X = pos.X, Y = pos.Y})
+        elseif input.UserInputType == Enum.UserInputType.Keyboard then
+            table.insert(MouseMacro, {Time = tick() - StartTime, Type = "Key", KeyCode = input.KeyCode, Down = true})
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gpe)
+    if IsRecording then
+        local pos = UserInputService:GetMouseLocation()
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            table.insert(MouseMacro, {Time = tick() - StartTime, Type = "ClickUp", X = pos.X, Y = pos.Y})
+        elseif input.UserInputType == Enum.UserInputType.Keyboard then
+            table.insert(MouseMacro, {Time = tick() - StartTime, Type = "Key", KeyCode = input.KeyCode, Down = false})
+        end
+    end
+end)
+
+-- บันทึกการขยับเมาส์ตามตำแหน่งจริง (Mouse Tracking)
+RunService.RenderStepped:Connect(function()
+    if IsRecording then
+        local pos = UserInputService:GetMouseLocation()
+        table.insert(MouseMacro, {Time = tick() - StartTime, Type = "Move", X = pos.X, Y = pos.Y})
+    end
+end)
