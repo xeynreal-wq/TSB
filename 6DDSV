@@ -1,0 +1,192 @@
+--[[
+    Script Name: อับดุล เถื่อน hub [TTD Macro & Infinite Edition]
+    Target Game: Toilet Tower Defense (TTD)
+    Executor: Xeno Executer (CoreGui UI)
+--]]
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Lighting = game:GetService("Lighting")
+
+-- Macro Storage
+local MacroData = {}
+local IsRecording = false
+local IsPlaying = false
+local StartTime = 0
+local LoopInfinite = false
+
+-- UI Setup
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "AbdulTTDHub"
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 240, 0, 310)
+Frame.Position = UDim2.new(0.05, 0, 0.25, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.Active = true
+Frame.Draggable = true
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "อับดุล เถื่อน hub | TTD Macro"
+Title.TextColor3 = Color3.fromRGB(0, 255, 120)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 15
+
+local StatusLabel = Instance.new("TextLabel", Frame)
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 25)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 35)
+StatusLabel.Text = "สถานะ: พร้อมใช้งาน"
+StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Font = Enum.Font.SourceSans
+StatusLabel.TextSize = 13
+
+local function createBtn(text, posY, color, callback)
+    local btn = Instance.new("TextButton", Frame)
+    btn.Size = UDim2.new(0.9, 0, 0, 32)
+    btn.Position = UDim2.new(0.05, 0, 0, posY)
+    btn.Text = text
+    btn.BackgroundColor3 = color
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 13
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+-- 1. REC BUTTON
+local RecBtn
+RecBtn = createBtn("🔴 เริ่มอัด Macro (Record)", 65, Color3.fromRGB(180, 40, 40), function()
+    if not IsRecording and not IsPlaying then
+        MacroData = {}
+        IsRecording = true
+        StartTime = tick()
+        StatusLabel.Text = "สถานะ: กำลังอัด Macro..."
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        RecBtn.Text = "⏹️ หยุดอัด Macro (Stop)"
+    elseif IsRecording then
+        IsRecording = false
+        StatusLabel.Text = "สถานะ: บันทึก Macro สำเร็จ! (" .. #MacroData .. " Action)"
+        StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+        RecBtn.Text = "🔴 เริ่มอัด Macro (Record)"
+    end
+end)
+
+-- 2. PLAY BUTTON
+local PlayBtn
+PlayBtn = createBtn("▶️ เล่น Macro (Play)", 105, Color3.fromRGB(40, 150, 40), function()
+    if #MacroData == 0 then
+        StatusLabel.Text = "สถานะ: ไม่มีข้อมูล Macro ให้เล่น!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 150, 0)
+        return
+    end
+
+    if not IsPlaying and not IsRecording then
+        IsPlaying = true
+        StatusLabel.Text = "สถานะ: กำลังรัน Macro..."
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+        
+        task.spawn(function()
+            while IsPlaying do
+                local playStart = tick()
+                for _, action in ipairs(MacroData) do
+                    if not IsPlaying then break end
+                    local timeToWait = action.Time - (tick() - playStart)
+                    if timeToWait > 0 then task.wait(timeToWait) end
+                    
+                    -- Execute Remote ในเกม TTD
+                    pcall(function()
+                        if action.Type == "Place" then
+                            game:GetService("ReplicatedStorage").RemoteFunction:InvokeServer("PlaceUnit", action.UnitName, action.CFrame)
+                        elseif action.Type == "Upgrade" then
+                            game:GetService("ReplicatedStorage").RemoteFunction:InvokeServer("UpgradeUnit", action.UnitModel)
+                        end
+                    end)
+                end
+                
+                if not LoopInfinite then
+                    IsPlaying = false
+                    StatusLabel.Text = "สถานะ: เล่น Macro จบแล้ว"
+                    StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    break
+                else
+                    StatusLabel.Text = "สถานะ: จบ 1 รอบ กำลังเริ่มรอบใหม่..."
+                    task.wait(3)
+                end
+            end
+        end)
+    else
+        IsPlaying = false
+        StatusLabel.Text = "สถานะ: หยุดเล่น Macro"
+        StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+end)
+
+-- 3. INFINITE TOGGLE
+local InfBtn = createBtn("🔄 โหมด Infinite: OFF", 145, Color3.fromRGB(100, 100, 100), function()
+    LoopInfinite = not LoopInfinite
+    InfBtn.Text = "🔄 โหมด Infinite: " .. (LoopInfinite and "ON" or "OFF")
+    InfBtn.BackgroundColor3 = LoopInfinite and Color3.fromRGB(0, 150, 200) or Color3.fromRGB(100, 100, 100)
+end)
+
+-- 4. AUTO REPLAY / AUTO PLAY AGAIN
+createBtn("🔁 Auto Play Again (กดเริ่มเกมใหม่ออโต้)", 185, Color3.fromRGB(80, 80, 180), function()
+    task.spawn(function()
+        while task.wait(2) do
+            pcall(function()
+                local playAgainGui = LocalPlayer.PlayerGui:FindFirstChild("PlayAgain") or LocalPlayer.PlayerGui:FindFirstChild("Results")
+                if playAgainGui then
+                    for _, btn in pairs(playAgainGui:GetDescendants()) do
+                        if btn:IsA("TextButton") and (btn.Name:lower():find("replay") or btn.Text:lower():find("play again") or btn.Text:lower():find("retry")) then
+                            firesignal(btn.MouseButton1Click)
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+    StatusLabel.Text = "สถานะ: เปิด Auto Play Again แล้ว"
+end)
+
+-- 5. CLAY MODE
+createBtn("🧱 เปิดโหมดดินน้ำมัน 100%", 225, Color3.fromRGB(50, 50, 50), function()
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+    end)
+    Lighting.GlobalShadows = false
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("Decal") or v:IsA("Texture") or v:IsA("SurfaceAppearance") then v:Destroy()
+        elseif v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then v:Destroy() end
+    end
+    StatusLabel.Text = "สถานะ: ปรับโหมดดินน้ำมันแล้ว"
+end)
+
+-- HOOK RECORDING (ดักจับการวางยูนิต และการอัปเกรด)
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    
+    if IsRecording and (method == "InvokeServer" or method == "FireServer") then
+        if args[1] == "PlaceUnit" then
+            table.insert(MacroData, {
+                Time = tick() - StartTime,
+                Type = "Place",
+                UnitName = args[2],
+                CFrame = args[3]
+            })
+        elseif args[1] == "UpgradeUnit" then
+            table.insert(MacroData, {
+                Time = tick() - StartTime,
+                Type = "Upgrade",
+                UnitModel = args[2]
+            })
+        end
+    end
+    return oldNamecall(self, ...)
+end)
