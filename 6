@@ -1,0 +1,92 @@
+-- SAFE EXTREME CLAY + LINK EXECUTOR (ALL-IN-ONE)
+local Lighting = game:GetService("Lighting")
+local Terrain = workspace:FindFirstChildOfClass("Terrain")
+
+-- 1. ปรับกราฟิกดินน้ำมันแบบปลอดภัย (ไม่ลบสคริปต์/UI เกม)
+pcall(function()
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+end)
+
+Lighting.GlobalShadows = false
+Lighting.FogEnd = 9e9
+Lighting.Brightness = 1
+
+if Terrain then
+    pcall(function() sethiddenproperty(Terrain, "Decoration", false) end)
+    Terrain.WaterWaveSize = 0
+    Terrain.WaterWaveSpeed = 0
+end
+
+local function applySafeClay(v)
+    if v:IsA("Decal") or v:IsA("Texture") or v:IsA("SurfaceAppearance") then
+        v:Destroy()
+    elseif v:IsA("BasePart") then
+        v.Material = Enum.Material.SmoothPlastic
+        v.Reflectance = 0
+    elseif v:IsA("MeshPart") then
+        v.TextureID = ""
+        v.Material = Enum.Material.SmoothPlastic
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") then
+        v.Enabled = false
+    end
+end
+
+for _, v in pairs(workspace:GetDescendants()) do
+    pcall(function() applySafeClay(v) end)
+end
+
+workspace.DescendantAdded:Connect(function(v)
+    task.spawn(function() pcall(function() applySafeClay(v) end) end)
+end)
+
+-- 2. สร้างกล่องใส่ลิงก์สคริปต์
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 300, 0, 120)
+Frame.Position = UDim2.new(0.5, -150, 0.3, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.Active = true
+Frame.Draggable = true
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 25)
+Title.Text = "CLAY MODE + LINK EXECUTOR"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+local TextBox = Instance.new("TextBox", Frame)
+TextBox.Size = UDim2.new(0.9, 0, 0.35, 0)
+TextBox.Position = UDim2.new(0.05, 0, 0.28, 0)
+TextBox.PlaceholderText = "วางเฉพาะ URL ลิงก์ตรงนี้..."
+TextBox.Text = ""
+TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TextBox.ClearTextOnFocus = false
+
+local Btn = Instance.new("TextButton", Frame)
+Btn.Size = UDim2.new(0.9, 0, 0.28, 0)
+Btn.Position = UDim2.new(0.05, 0, 0.68, 0)
+Btn.Text = "RUN SCRIPT"
+Btn.BackgroundColor3 = Color3.fromRGB(0, 180, 90)
+Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+Btn.MouseButton1Click:Connect(function()
+    local url = TextBox.Text
+    if url ~= "" then
+        local success, err = pcall(function()
+            loadstring(game:HttpGet(url))()
+        end)
+        if success then
+            Btn.Text = "RUN SUCCESS!"
+            Btn.BackgroundColor3 = Color3.fromRGB(0, 220, 0)
+        else
+            Btn.Text = "ERROR!"
+            Btn.BackgroundColor3 = Color3.fromRGB(220, 0, 0)
+            warn(err)
+        end
+        task.wait(1.5)
+        Btn.Text = "RUN SCRIPT"
+        Btn.BackgroundColor3 = Color3.fromRGB(0, 180, 90)
+    end
+end)
