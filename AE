@@ -1,0 +1,395 @@
+--[[
+    Script Name: อับดุล มาโคฟามAE
+    UI Style: Redz Hub V2 Dark Modern (Mobile Optimized)
+    Features: Built-in Anti-Ban, Permanent Anti-AFK, TinyTask Macro, Real-time AFK Tracker, Manual Playback Stop
+--]]
+
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- ---------------------------------------------------------
+-- 1. BUILT-IN ANTI-BAN & LOG BLOCKER ENGINE
+-- ---------------------------------------------------------
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
+        local name = tostring(self):lower()
+        if name:find("ban") or name:find("kick") or name:find("cheat") or name:find("detect") or name:find("log") then
+            return nil
+        end
+    end
+    return oldNamecall(self, ...)
+end)
+
+pcall(function()
+    local VirtualUser = game:GetService("VirtualUser")
+    LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end)
+
+-- Macro Engine Data
+local MouseMacro = {}
+local IsRecording = false
+local IsPlaying = false
+local StartTime = 0
+local ScriptStartTick = tick()
+
+-- ---------------------------------------------------------
+-- 2. REDZ HUB PROFESSIONAL UI SETUP
+-- ---------------------------------------------------------
+if CoreGui:FindFirstChild("AbdulRedzHub") then
+    CoreGui.AbdulRedzHub:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "AbdulRedzHub"
+
+-- Main Window Frame
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 480, 0, 280)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -140)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+
+local MainUICorner = Instance.new("UICorner", MainFrame)
+MainUICorner.CornerRadius = UDim.new(0, 8)
+
+-- Top Header Bar
+local TopBar = Instance.new("Frame", MainFrame)
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+TopBar.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+TopBar.BorderSizePixel = 0
+
+local TopCorner = Instance.new("UICorner", TopBar)
+TopCorner.CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel", TopBar)
+Title.Size = UDim2.new(0, 250, 1, 0)
+Title.Position = UDim2.new(0, 12, 0, 0)
+Title.Text = "อับดุล มาโคฟามAE"
+Title.TextColor3 = Color3.fromRGB(180, 120, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 15
+Title.BackgroundTransparency = 1
+
+local CloseBtn = Instance.new("TextButton", TopBar)
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 2.5)
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 14
+
+local CloseCorner = Instance.new("UICorner", CloseBtn)
+CloseCorner.CornerRadius = UDim.new(0, 6)
+
+-- Sidebar Navigation
+local SideBar = Instance.new("Frame", MainFrame)
+SideBar.Size = UDim2.new(0, 130, 1, -35)
+SideBar.Position = UDim2.new(0, 0, 0, 35)
+SideBar.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+SideBar.BorderSizePixel = 0
+
+local SideLayout = Instance.new("UIListLayout", SideBar)
+SideLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SideLayout.Padding = UDim.new(0, 4)
+
+local SidePadding = Instance.new("UIPadding", SideBar)
+SidePadding.PaddingTop = UDim.new(0, 8)
+SidePadding.PaddingLeft = UDim.new(0, 8)
+
+-- Content Pages Frame
+local ContentArea = Instance.new("Frame", MainFrame)
+ContentArea.Size = UDim2.new(1, -130, 1, -35)
+ContentArea.Position = UDim2.new(0, 130, 0, 35)
+ContentArea.BackgroundTransparency = 1
+
+-- Status & AFK Time Footer Info
+local StatusText = Instance.new("TextLabel", ContentArea)
+StatusText.Size = UDim2.new(1, -20, 0, 18)
+StatusText.Position = UDim2.new(0, 10, 1, -40)
+StatusText.Text = "Status: Anti-Ban Enabled ✅"
+StatusText.TextColor3 = Color3.fromRGB(100, 255, 150)
+StatusText.Font = Enum.Font.SourceSans
+StatusText.TextSize = 12
+StatusText.TextXAlignment = Enum.TextXAlignment.Left
+StatusText.BackgroundTransparency = 1
+
+local TimerText = Instance.new("TextLabel", ContentArea)
+TimerText.Size = UDim2.new(1, -20, 0, 18)
+TimerText.Position = UDim2.new(0, 10, 1, -22)
+TimerText.Text = "⏱️ AFK Time: 00h 00m 00s"
+TimerText.TextColor3 = Color3.fromRGB(255, 200, 100)
+TimerText.Font = Enum.Font.SourceSansBold
+TimerText.TextSize = 12
+TimerText.TextXAlignment = Enum.TextXAlignment.Left
+TimerText.BackgroundTransparency = 1
+
+-- ระบบคำนวณเวลานับถอยหลัง AFK Real-time
+task.spawn(function()
+    while task.wait(1) do
+        local elapsed = math.floor(tick() - ScriptStartTick)
+        local hours = math.floor(elapsed / 3600)
+        local mins = math.floor((elapsed % 3600) / 60)
+        local secs = elapsed % 60
+        TimerText.Text = string.format("⏱️ AFK Time: %02dh %02dm %02ds", hours, mins, secs)
+    end
+end)
+
+-- Tab Handling Engine
+local Tabs = {}
+local function CreateTab(name, icon)
+    local TabBtn = Instance.new("TextButton", SideBar)
+    TabBtn.Size = UDim2.new(0, 114, 0, 32)
+    TabBtn.Text = "  " .. icon .. "  " .. name
+    TabBtn.TextColor3 = Color3.fromRGB(160, 160, 180)
+    TabBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+    TabBtn.Font = Enum.Font.SourceSansBold
+    TabBtn.TextSize = 13
+    TabBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+    local BtnCorner = Instance.new("UICorner", TabBtn)
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+
+    local Page = Instance.new("ScrollingFrame", ContentArea)
+    Page.Size = UDim2.new(1, -20, 1, -48)
+    Page.Position = UDim2.new(0, 10, 0, 5)
+    Page.BackgroundTransparency = 1
+    Page.ScrollBarThickness = 2
+    Page.Visible = false
+
+    local PageLayout = Instance.new("UIListLayout", Page)
+    PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    PageLayout.Padding = UDim.new(0, 6)
+
+    TabBtn.MouseButton1Click:Connect(function()
+        for _, t in pairs(Tabs) do
+            t.Page.Visible = false
+            t.Btn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+            t.Btn.TextColor3 = Color3.fromRGB(160, 160, 180)
+        end
+        Page.Visible = true
+        TabBtn.BackgroundColor3 = Color3.fromRGB(120, 60, 220)
+        TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+
+    table.insert(Tabs, {Btn = TabBtn, Page = Page})
+    return Page
+end
+
+-- UI Element Builders
+local function CreateButton(parent, text, color, callback)
+    local Btn = Instance.new("TextButton", parent)
+    Btn.Size = UDim2.new(1, -4, 0, 34)
+    Btn.Text = text
+    Btn.BackgroundColor3 = color
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.Font = Enum.Font.SourceSansBold
+    Btn.TextSize = 13
+    
+    local Corner = Instance.new("UICorner", Btn)
+    Corner.CornerRadius = UDim.new(0, 6)
+    
+    Btn.MouseButton1Click:Connect(callback)
+    return Btn
+end
+
+-- Create Redz Hub Tabs
+local MacroPage = CreateTab("Macro Play", "⚙️")
+local SettingsPage = CreateTab("Settings", "🛠️")
+
+-- Default Open First Tab
+Tabs[1].Page.Visible = true
+Tabs[1].Btn.BackgroundColor3 = Color3.fromRGB(120, 60, 220)
+Tabs[1].Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- ---------------------------------------------------------
+-- 3. MACRO CONTROLS (MACRO TAB)
+-- ---------------------------------------------------------
+local RecBtn
+RecBtn = CreateButton(MacroPage, "🔴 Record Macro", Color3.fromRGB(180, 45, 45), function()
+    if not IsRecording and not IsPlaying then
+        MouseMacro = {}
+        IsRecording = true
+        StartTime = tick()
+        StatusText.Text = "Status: Recording Mouse/Touch Inputs..."
+        StatusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+        RecBtn.Text = "⏹️ Stop Recording"
+    elseif IsRecording then
+        IsRecording = false
+        StatusText.Text = "Status: Macro Recorded (" .. #MouseMacro .. " Nodes)"
+        StatusText.TextColor3 = Color3.fromRGB(100, 255, 150)
+        RecBtn.Text = "🔴 Record Macro"
+    end
+end)
+
+local PlayBtn
+PlayBtn = CreateButton(MacroPage, "▶️ Play Infinite Loop", Color3.fromRGB(40, 140, 60), function()
+    if IsRecording then return end
+
+    if #MouseMacro == 0 then
+        StatusText.Text = "Status: No Macro Data Recorded!"
+        StatusText.TextColor3 = Color3.fromRGB(255, 150, 0)
+        return
+    end
+
+    if not IsPlaying then
+        IsPlaying = true
+        StatusText.Text = "Status: Running Macro Loop (Safe Mode)..."
+        StatusText.TextColor3 = Color3.fromRGB(0, 200, 255)
+        
+        task.spawn(function()
+            while IsPlaying do
+                local playStart = tick()
+                for _, action in ipairs(MouseMacro) do
+                    if not IsPlaying then break end
+                    
+                    local timeToWait = action.Time - (tick() - playStart)
+                    if timeToWait > 0 then task.wait(timeToWait) end
+                    
+                    pcall(function()
+                        local jitterX = action.X + math.random(-1, 1)
+                        local jitterY = action.Y + math.random(-1, 1)
+                        
+                        if action.Type == "Move" then
+                            VirtualInputManager:SendMouseMoveEvent(jitterX, jitterY, game)
+                        elseif action.Type == "ClickDown" then
+                            VirtualInputManager:SendMouseButtonEvent(jitterX, jitterY, 0, true, game, 1)
+                        elseif action.Type == "ClickUp" then
+                            VirtualInputManager:SendMouseButtonEvent(jitterX, jitterY, 0, false, game, 1)
+                        elseif action.Type == "Key" then
+                            VirtualInputManager:SendKeyEvent(action.Down, action.KeyCode, false, game)
+                        end
+                    end)
+                end
+                
+                if IsPlaying then
+                    StatusText.Text = "Status: Loop Finished -> Replaying..."
+                    task.wait(0.5)
+                end
+            end
+        end)
+    end
+end)
+
+-- ปุ่มหยุดการทำงานของมาโคร (Stop Playback Button)
+CreateButton(MacroPage, "⏸️ Stop Playback", Color3.fromRGB(200, 100, 0), function()
+    if IsPlaying then
+        IsPlaying = false
+        StatusText.Text = "Status: Stopped Macro Playback ⏸️"
+        StatusText.TextColor3 = Color3.fromRGB(255, 200, 100)
+    else
+        StatusText.Text = "Status: Macro is not playing!"
+        StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+end)
+
+CreateButton(MacroPage, "🔁 Auto Replay Match", Color3.fromRGB(50, 70, 140), function()
+    task.spawn(function()
+        while task.wait(2) do
+            pcall(function()
+                local gui = LocalPlayer.PlayerGui
+                for _, btn in pairs(gui:GetDescendants()) do
+                    if btn:IsA("TextButton") and (btn.Text:lower():find("replay") or btn.Text:lower():find("retry") or btn.Text:lower():find("play again")) then
+                        firesignal(btn.MouseButton1Click)
+                    end
+                end
+            end)
+        end
+    end)
+    StatusText.Text = "Status: Auto Replay Activated"
+end)
+
+-- ---------------------------------------------------------
+-- 4. SETTINGS CONTROLS (SETTINGS TAB)
+-- ---------------------------------------------------------
+CreateButton(SettingsPage, "🧱 Boost FPS / Clay Mode", Color3.fromRGB(45, 45, 55), function()
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+    end)
+    Lighting.GlobalShadows = false
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("Decal") or v:IsA("Texture") or v:IsA("SurfaceAppearance") then v:Destroy()
+        elseif v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then v:Destroy() end
+    end
+    StatusText.Text = "Status: Clay FPS Boost Enabled"
+end)
+
+-- ---------------------------------------------------------
+-- 5. FLOATING TOGGLE BUTTON
+-- ---------------------------------------------------------
+local ToggleBtn = Instance.new("ImageButton", ScreenGui)
+ToggleBtn.Name = "RedzToggleButton"
+ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
+ToggleBtn.Position = UDim2.new(0.02, 0, 0.2, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+ToggleBtn.Active = true
+ToggleBtn.Draggable = true
+
+local ToggleCorner = Instance.new("UICorner", ToggleBtn)
+ToggleCorner.CornerRadius = UDim.new(1, 0)
+
+local ToggleImage = Instance.new("TextLabel", ToggleBtn)
+ToggleImage.Size = UDim2.new(1, 0, 1, 0)
+ToggleImage.Text = "AE"
+ToggleImage.TextColor3 = Color3.fromRGB(180, 120, 255)
+ToggleImage.Font = Enum.Font.SourceSansBold
+ToggleImage.TextSize = 14
+ToggleImage.BackgroundTransparency = 1
+
+local UIMinimized = false
+local function ToggleMainUI()
+    UIMinimized = not UIMinimized
+    MainFrame.Visible = not UIMinimized
+end
+
+ToggleBtn.MouseButton1Click:Connect(ToggleMainUI)
+CloseBtn.MouseButton1Click:Connect(ToggleMainUI)
+
+-- ---------------------------------------------------------
+-- 6. MOUSE & TOUCH EVENT RECORDING ENGINE
+-- ---------------------------------------------------------
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if IsRecording then
+        local pos = UserInputService:GetMouseLocation()
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            table.insert(MouseMacro, {Time = tick() - StartTime, Type = "ClickDown", X = pos.X, Y = pos.Y})
+        elseif input.UserInputType == Enum.UserInputType.Keyboard then
+            table.insert(MouseMacro, {Time = tick() - StartTime, Type = "Key", KeyCode = input.KeyCode, Down = true})
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gpe)
+    if IsRecording then
+        local pos = UserInputService:GetMouseLocation()
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            table.insert(MouseMacro, {Time = tick() - StartTime, Type = "ClickUp", X = pos.X, Y = pos.Y})
+        elseif input.UserInputType == Enum.UserInputType.Keyboard then
+            table.insert(MouseMacro, {Time = tick() - StartTime, Type = "Key", KeyCode = input.KeyCode, Down = false})
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if IsRecording then
+        local pos = UserInputService:GetMouseLocation()
+        table.insert(MouseMacro, {Time = tick() - StartTime, Type = "Move", X = pos.X, Y = pos.Y})
+    end
+end)
