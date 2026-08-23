@@ -1,0 +1,252 @@
+--[[
+    Script Name: อับดุล เถื่อน hub [vMAX]
+    Target Game: The Strongest Battlegrounds (TSB)
+    Features: Auto Farm Kill + Smart AI + Auto Ultimate (G) + Clay Mode
+--]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "อับดุล เถื่อน hub [vMAX]",
+   LoadingTitle = "อับดุล เถื่อน hub vMAX",
+   LoadingSubtitle = "Ultimate AI & Auto Ultimate Edition",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false
+})
+
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Variables
+local AutoFarmKillAI = false
+local AutoUltimate = false
+local AutoTrash = false
+local BlackScreenEnabled = false
+local BlackScreenGui = nil
+
+-- Tabs
+local MainTab = Window:CreateTab("หน้าหลัก & FPS", 4483362458)
+local AITab = Window:CreateTab("ระบบ AI ออโต้ฟาร์ม", 4483362458)
+local UtilityTab = Window:CreateTab("ระบบฟาร์ม/ถังขยะ", 4483362458)
+
+---------------------------------------------------------
+-- 1. MAIN & FPS BOOST (ภาพดินน้ำมัน + จอดำ)
+---------------------------------------------------------
+MainTab:CreateToggle({
+   Name = "Black Screen Mode (เปิดจอดำดัน FPS สูงสุด)",
+   CurrentValue = false,
+   Callback = function(Value)
+      BlackScreenEnabled = Value
+      if BlackScreenEnabled then
+         BlackScreenGui = Instance.new("ScreenGui")
+         local Frame = Instance.new("Frame")
+         local Text = Instance.new("TextLabel")
+         
+         BlackScreenGui.Name = "AbdulBlackScreen"
+         BlackScreenGui.Parent = game:GetService("CoreGui")
+         BlackScreenGui.IgnoreGuiInset = true
+         
+         Frame.Parent = BlackScreenGui
+         Frame.Size = UDim2.new(1, 0, 1, 0)
+         Frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+         
+         Text.Parent = Frame
+         Text.Size = UDim2.new(1, 0, 1, 0)
+         Text.Text = "BLACK SCREEN FPS BOOST ACTIVE\n[ อับดุล เถื่อน hub vMAX ]"
+         Text.TextColor3 = Color3.fromRGB(0, 255, 120)
+         Text.TextSize = 24
+         Text.Font = Enum.Font.SourceSansBold
+         Text.BackgroundTransparency = 1
+         
+         RunService:Set3dRenderingEnabled(false)
+      else
+         if BlackScreenGui then
+            BlackScreenGui:Destroy()
+         end
+         RunService:Set3dRenderingEnabled(true)
+      end
+   end,
+})
+
+MainTab:CreateButton({
+   Name = "เปิดภาพดินน้ำมัน 100% (Extreme Clay)",
+   Callback = function()
+      pcall(function()
+         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+         sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+      end)
+      
+      Lighting.GlobalShadows = false
+      Lighting.FogEnd = 9e9
+      Lighting.Brightness = 1
+
+      local function applyClay(v)
+         if v:IsA("Decal") or v:IsA("Texture") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") or v:IsA("SurfaceAppearance") then
+            v:Destroy()
+         elseif v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+         elseif v:IsA("MeshPart") then
+            v.TextureID = ""
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+         elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Highlight") then
+            v:Destroy()
+         end
+      end
+
+      for _, v in pairs(game:GetDescendants()) do
+         pcall(function() applyClay(v) end)
+      end
+
+      game.DescendantAdded:Connect(function(v)
+         task.spawn(function() pcall(function() applyClay(v) end) end)
+      end)
+
+      Rayfield:Notify({Title = "อับดุล เถื่อน hub", Content = "เปิดโหมดดินน้ำมันเรียบร้อย!", Duration = 3})
+   end,
+})
+
+---------------------------------------------------------
+-- 2. SMART COMBAT AI & AUTO ULTIMATE (ระบบต่อสู้ & กด G)
+---------------------------------------------------------
+AITab:CreateToggle({
+   Name = "Auto Ultimate / Awaken (ออโต้กดแปลงร่าง / กดตัว G)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoUltimate = Value
+      if AutoUltimate then
+         task.spawn(function()
+            while AutoUltimate do
+               task.wait(0.2)
+               if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character.Humanoid.Health > 0 then
+                  -- สั่งกดปุ่ม G เพื่อแปลงร่างเมื่อเกจเต็ม
+                  VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+                  task.wait(0.05)
+                  VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+               end
+            end
+         end)
+      end
+   end,
+})
+
+AITab:CreateToggle({
+   Name = "Smart AI Auto Farm Kill (ฟาร์มคิล + AI ฉลาดไม่เสียสกิลฟรี)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoFarmKillAI = Value
+      if AutoFarmKillAI then
+         task.spawn(function()
+            local skillKeys = {Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four}
+            
+            while AutoFarmKillAI do
+               task.wait(0.03)
+               
+               -- ค้นหาคนที่ HP น้อยสุดในเซิฟ
+               local target = nil
+               local lowestHP = math.huge
+
+               for _, plr in pairs(Players:GetPlayers()) do
+                  if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character:FindFirstChild("HumanoidRootPart") then
+                     local hum = plr.Character.Humanoid
+                     if hum.Health > 0 and hum.Health < lowestHP then
+                        lowestHP = hum.Health
+                        target = plr
+                     end
+                  end
+               end
+
+               if target and target.Character then
+                  local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+                  local targetHum = target.Character:FindFirstChild("Humanoid")
+                  local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                  local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+
+                  if myHRP and targetHRP and targetHum and myHum.Health > 0 then
+                     
+                     -- เช็กสถานะ Knockdown / Ragdoll (ถ้าศัตรูล้มอยู่อย่าเพิ่งใช้สกิล)
+                     local isKnocked = false
+                     if target.Character:FindFirstChild("Ragdoll") or targetHum:GetState() == Enum.HumanoidStateType.Physics or targetHum:GetState() == Enum.HumanoidStateType.Ragdoll then
+                        isKnocked = true
+                     end
+
+                     -- คำนวณตำแหน่งเข้าล็อกด้านหลังแม่นยำ
+                     local targetCF = targetHRP.CFrame
+                     local behindPosition = targetCF * CFrame.new(0, 0, 2.2)
+                     myHRP.CFrame = behindPosition
+
+                     -- AI ตัดสินใจการโจมตี
+                     if isKnocked then
+                        -- ถ้าศัตรูนอนล้ม ให้กดแค่ต่อยธรรมดาเก็บเลือด ไม่เสียสกิลฟรี
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+                     else
+                        -- ถ้าศัตรูยืนอยู่ / สวนกลับ สั่งต่อย + วนใช้สกิล 1-4
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+
+                        for _, key in ipairs(skillKeys) do
+                           if not AutoFarmKillAI then break end
+                           
+                           -- บล็อกป้องกันชั่วคราวถ้าศัตรูหันหน้ามาต่อยสวน
+                           local angle = math.abs((myHRP.Position - targetHRP.Position).LookVector:Dot(targetHRP.CFrame.LookVector))
+                           if angle > 0.8 then
+                              VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                              task.wait(0.05)
+                              VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                           end
+
+                           VirtualInputManager:SendKeyEvent(true, key, false, game)
+                           task.wait(0.02)
+                           VirtualInputManager:SendKeyEvent(false, key, false, game)
+                        end
+                     end
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
+
+---------------------------------------------------------
+-- 3. UTILITY (ระบบ Auto Pick Trash)
+---------------------------------------------------------
+UtilityTab:CreateToggle({
+   Name = "Auto Pick Trash (หยิบถังขยะอัตโนมัติ)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoTrash = Value
+      if AutoTrash then
+         task.spawn(function()
+            while AutoTrash do
+               task.wait(0.3)
+               if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                  local myHRP = LocalPlayer.Character.HumanoidRootPart
+                  
+                  for _, item in pairs(workspace:GetDescendants()) do
+                     if item:IsA("ProximityPrompt") then
+                        local parentName = item.Parent and item.Parent.Name:lower() or ""
+                        if parentName:find("trash") or parentName:find("can") or parentName:find("garb") then
+                           if (myHRP.Position - item.Parent.Position).Magnitude < 20 then
+                              fireproximityprompt(item)
+                           end
+                        end
+                     elseif item:IsA("BasePart") and (item.Name:lower():find("trash") or item.Name:lower():find("can")) then
+                        if (myHRP.Position - item.Position).Magnitude < 15 then
+                           firetouchinterest(myHRP, item, 0)
+                           firetouchinterest(myHRP, item, 1)
+                        end
+                     end
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
