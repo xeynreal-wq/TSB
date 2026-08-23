@@ -1,0 +1,202 @@
+--[[
+    Script Name: อับดุล เถื่อน hub
+    Target Game: The Strongest Battlegrounds (TSB)
+    Optimized for Xeno Executer
+--]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "อับดุล เถื่อน hub",
+   LoadingTitle = "อับดุล เถื่อน hub | TSB Extreme",
+   LoadingSubtitle = "by Abdul Team",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false
+})
+
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Variables
+local AutoTrash = false
+local AutoSkill = false
+local AutoBlock = false
+
+-- Tabs
+local MainTab = Window:CreateTab("หน้าหลัก", 4483362458)
+local CombatTab = Window:CreateTab("ต่อสู้ & วาร์ป", 4483362458)
+local UtilityTab = Window:CreateTab("ระบบฟาร์ม/ถังขยะ", 4483362458)
+
+---------------------------------------------------------
+-- 1. CLAY MODE (โหมดดินน้ำมัน)
+---------------------------------------------------------
+MainTab:CreateButton({
+   Name = "เปิดภาพดินน้ำมัน 100% (Clay Mode)",
+   Callback = function()
+      pcall(function()
+         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+         sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+      end)
+      
+      Lighting.GlobalShadows = false
+      Lighting.FogEnd = 9e9
+      Lighting.Brightness = 1
+
+      local function applyClay(v)
+         if v:IsA("Decal") or v:IsA("Texture") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") or v:IsA("SurfaceAppearance") then
+            v:Destroy()
+         elseif v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+         elseif v:IsA("MeshPart") then
+            v.TextureID = ""
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+         elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Highlight") then
+            v:Destroy()
+         end
+      end
+
+      for _, v in pairs(game:GetDescendants()) do
+         pcall(function() applyClay(v) end)
+      end
+
+      game.DescendantAdded:Connect(function(v)
+         task.spawn(function() pcall(function() applyClay(v) end) end)
+      end)
+
+      Rayfield:Notify({Title = "อับดุล เถื่อน hub", Content = "ปรับภาพดินน้ำมันเรียบร้อย ลื่นขั้นสุด!", Duration = 3})
+   end,
+})
+
+---------------------------------------------------------
+-- 2. COMBAT & WARP LOWEST HP (วาร์ปหาคนเลือดน้อย & สกิลออโต้)
+---------------------------------------------------------
+CombatTab:CreateButton({
+   Name = "วาร์ปไปหลังคนเลือดน้อยที่สุดในเซิฟ",
+   Callback = function()
+      local lowestPlr = nil
+      local lowestHP = math.huge
+
+      for _, plr in pairs(Players:GetPlayers()) do
+         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local hum = plr.Character.Humanoid
+            if hum.Health > 0 and hum.Health < lowestHP then
+               lowestHP = hum.Health
+               lowestPlr = plr
+            end
+         end
+      end
+
+      if lowestPlr and lowestPlr.Character and lowestPlr.Character:FindFirstChild("HumanoidRootPart") then
+         local targetHRP = lowestPlr.Character.HumanoidRootPart
+         local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+         
+         if myHRP then
+            -- วาร์ปไปโผล่ด้านหลังศัตรูระยะ 3 บล็อก
+            myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 3)
+            Rayfield:Notify({
+               Title = "อับดุล เถื่อน hub",
+               Content = "วาร์ปไปหา: " .. lowestPlr.DisplayName .. " (HP: " .. math.floor(lowestHP) .. ")",
+               Duration = 3
+            })
+         end
+      else
+         Rayfield:Notify({Title = "อับดุล เถื่อน hub", Content = "ไม่พบเป้าหมายในเซิร์ฟเวอร์", Duration = 3})
+      end
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Auto Skill (กดใช้สกิล 1-4 อัตโนมัติทุกตัวละคร)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoSkill = Value
+      if AutoSkill then
+         task.spawn(function()
+            local keys = {Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four}
+            while AutoSkill do
+               task.wait(0.2)
+               if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character.Humanoid.Health > 0 then
+                  for _, key in ipairs(keys) do
+                     if not AutoSkill then break end
+                     VirtualInputManager:SendKeyEvent(true, key, false, game)
+                     task.wait(0.05)
+                     VirtualInputManager:SendKeyEvent(false, key, false, game)
+                     task.wait(0.1)
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Auto Block (บล็อกการโจมตีอัตโนมัติ)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoBlock = Value
+      if AutoBlock then
+         task.spawn(function()
+            while AutoBlock do
+               task.wait(0.1)
+               if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                  for _, plr in pairs(Players:GetPlayers()) do
+                     if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (LocalPlayer.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+                        if dist <= 12 then
+                           VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                           task.wait(0.4)
+                           VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                        end
+                     end
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
+
+---------------------------------------------------------
+-- 3. UTILITY (แก้ระบบ Auto Pick Trash / ถังขยะ)
+---------------------------------------------------------
+UtilityTab:CreateToggle({
+   Name = "Auto Pick Trash (หยิบถังขยะเข้ามืออัตโนมัติ)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutoTrash = Value
+      if AutoTrash then
+         task.spawn(function()
+            while AutoTrash do
+               task.wait(0.3)
+               if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                  local myHRP = LocalPlayer.Character.HumanoidRootPart
+                  
+                  -- ค้นหา ProximityPrompt หรือ Object ถังขยะรอบๆ
+                  for _, item in pairs(workspace:GetDescendants()) do
+                     if item:IsA("ProximityPrompt") then
+                        local parentName = item.Parent and item.Parent.Name:lower() or ""
+                        if parentName:find("trash") or parentName:find("can") or parentName:find("garb") then
+                           if (myHRP.Position - item.Parent.Position).Magnitude < 20 then
+                              fireproximityprompt(item)
+                           end
+                        end
+                     elseif item:IsA("BasePart") and (item.Name:lower():find("trash") or item.Name:lower():find("can")) then
+                        if (myHRP.Position - item.Position).Magnitude < 15 then
+                           firetouchinterest(myHRP, item, 0)
+                           firetouchinterest(myHRP, item, 1)
+                        end
+                     end
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
