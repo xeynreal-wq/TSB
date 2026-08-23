@@ -1,0 +1,168 @@
+--[[
+    Script Name: อับดุล เถื่อน hub [Fix Redo]
+    Target Game: The Strongest Battlegrounds (TSB)
+    Optimized: Xeno Executer (No Rayfield Dependency)
+--]]
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Toggles
+local AutoFarm = false
+local AutoUltimate = false
+local AutoTrash = false
+local BlackScreen = false
+
+-- UI Setup (CoreGui - ไม่บั๊ก ไม่หลุด)
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+ScreenGui.Name = "AbdulThuanHub"
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 220, 0, 280)
+MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "อับดุล เถื่อน hub [Fix]"
+Title.TextColor3 = Color3.fromRGB(0, 255, 120)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+
+local function createToggle(name, pos, callback)
+    local Btn = Instance.new("TextButton", MainFrame)
+    Btn.Size = UDim2.new(0.9, 0, 0, 35)
+    Btn.Position = UDim2.new(0.05, 0, 0, pos)
+    Btn.Text = name .. ": OFF"
+    Btn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.Font = Enum.Font.SourceSansBold
+    Btn.TextSize = 13
+    
+    local enabled = false
+    Btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        Btn.Text = name .. (enabled and ": ON" or ": OFF")
+        Btn.BackgroundColor3 = enabled and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
+        callback(enabled)
+    end)
+end
+
+-- 1. Clay Mode Button
+local ClayBtn = Instance.new("TextButton", MainFrame)
+ClayBtn.Size = UDim2.new(0.9, 0, 0, 35)
+ClayBtn.Position = UDim2.new(0.05, 0, 0, 40)
+ClayBtn.Text = "เปิดภาพดินน้ำมัน 100%"
+ClayBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ClayBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClayBtn.Font = Enum.Font.SourceSansBold
+ClayBtn.TextSize = 13
+ClayBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+    end)
+    Lighting.GlobalShadows = false
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("Decal") or v:IsA("Texture") or v:IsA("SurfaceAppearance") then v:Destroy()
+        elseif v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then v:Destroy() end
+    end
+end)
+
+-- 2. Toggle Auto Farm Kill
+createToggle("Auto Farm Kill (วนไม่หยุด)", 85, function(val)
+    AutoFarm = val
+end)
+
+-- 3. Toggle Auto Ultimate (G)
+createToggle("Auto Ultimate (กด G)", 130, function(val)
+    AutoUltimate = val
+end)
+
+-- 4. Toggle Auto Trash
+createToggle("Auto Pick Trash (ถังขยะ)", 175, function(val)
+    AutoTrash = val
+end)
+
+-- 5. Toggle Black Screen
+local BlackGui
+createToggle("Black Screen (ดัน FPS)", 220, function(val)
+    BlackScreen = val
+    if BlackScreen then
+        BlackGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+        local f = Instance.new("Frame", BlackGui)
+        f.Size = UDim2.new(1,0,1,0)
+        f.BackgroundColor3 = Color3.new(0,0,0)
+        RunService:Set3dRenderingEnabled(false)
+    else
+        if BlackGui then BlackGui:Destroy() end
+        RunService:Set3dRenderingEnabled(true)
+    end
+end)
+
+-- Core Loop (ใช้ Heartbeat วนลูปเสถียรที่สุด สคริปต์ไม่ตัด)
+local lastSkill = tick()
+RunService.Heartbeat:Connect(function()
+    if AutoFarm and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local myHRP = LocalPlayer.Character.HumanoidRootPart
+        
+        -- หาคน HP น้อยที่สุด
+        local target = nil
+        local minHP = math.huge
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character:FindFirstChild("HumanoidRootPart") then
+                local hum = p.Character.Humanoid
+                if hum.Health > 0 and hum.Health < minHP then
+                    minHP = hum.Health
+                    target = p
+                end
+            end
+        end
+
+        -- วาร์ปเกาะหลัง + กดโจมตีต่อเนื่อง
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local tHRP = target.Character.HumanoidRootPart
+            myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 2)
+            
+            -- กดต่อยธรรมดา
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+
+            -- วนสกิล 1-4
+            if tick() - lastSkill > 0.15 then
+                lastSkill = tick()
+                local keys = {Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four}
+                local k = keys[math.random(1, #keys)]
+                VirtualInputManager:SendKeyEvent(true, k, false, game)
+                VirtualInputManager:SendKeyEvent(false, k, false, game)
+            end
+        end
+    end
+
+    -- Auto Ulti (G)
+    if AutoUltimate then
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+    end
+end)
+
+-- Auto Trash Loop
+task.spawn(function()
+    while task.wait(0.5) do
+        if AutoTrash and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local myHRP = LocalPlayer.Character.HumanoidRootPart
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("ProximityPrompt") and (myHRP.Position - v.Parent.Position).Magnitude < 20 then
+                    fireproximityprompt(v)
+                end
+            end
+        end
+    end
+end)
